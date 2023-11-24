@@ -1,4 +1,4 @@
-import LineString from 'ol/geom/LineString';
+import { LineString } from 'ol/geom';
 import type { Coordinate } from 'ol/coordinate';
 
 /**
