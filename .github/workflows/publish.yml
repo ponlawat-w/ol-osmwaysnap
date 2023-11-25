@@ -1,0 +1,42 @@
+name: Publish
+on:
+  push:
+    branches: master
+jobs:
+  unit-tests:
+    name: Unit Tests
+    uses: ./.github/workflows/unit-tests.yml
+  publish:
+    name: Publish
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        ref: ${{ github.ref }}
+    - name: Setup Node
+      uses: actions/setup-node@v3
+      with:
+        node-version: 20
+        registry-url: https://registry.npmjs.org/
+    - name: Get package.json
+      id: get-package
+      run: echo PACKAGE=$(cat ./package.json) >> $GITHUB_OUTPUT
+    - name: Get package version
+      id: get-package-version
+      run: echo VERSION="${{ fromJson(steps.get-package.outputs.PACKAGE).version }}" >> $GITHUB_OUTPUT
+    - name: Install
+      run: npm ci
+    - name: Build
+      run: npm run build
+    - name: Publish
+      run: npm publish
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    - name: Tag
+      run: |
+        git config --global user.name "ponlawat-w"
+        git config --global user.email "ponlawat_w@outlook.co.th"
+        git tag -fa ${{ steps.get-package-version.outputs.VERSION }}
+        git push --force origin ${{ steps.get-package-version.outputs.VERSION }}
