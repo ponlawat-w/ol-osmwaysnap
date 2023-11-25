@@ -1,5 +1,6 @@
 {
   "name": "ol-osmwaysnap",
+  "type": "module",
   "version": "0.1.0",
   "description": "OpenLayers Interaction Extension for Snapping Ways from OSM using Overpass API",
   "keywords": [
@@ -12,7 +13,8 @@
   ],
   "main": "dist/index.js",
   "scripts": {
-    "build": "npx tsc && npx webpack"
+    "build": "npx tsc && npx webpack",
+    "test": "npm run build && npx vitest run --config ./vitest.config.ts"
   },
   "repository": {
     "type": "git",
@@ -31,12 +33,14 @@
   },
   "homepage": "https://github.com/ponlawat-w/ol-osmwaysnap#readme",
   "devDependencies": {
+    "happy-dom": "^12.10.3",
     "ol": "^8.2.0",
     "typescript": "^5.3.2",
+    "vitest": "^0.34.6",
     "webpack": "^5.74.0",
     "webpack-cli": "^4.10.0"
   },
   "dependencies": {
-    "ol-osmoverpass": "^0.1.0"
+    "ol-osmoverpass": "^0.2.0"
   }
 }

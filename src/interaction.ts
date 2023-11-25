@@ -14,7 +14,7 @@ import type { StyleLike } from 'ol/style/Style';
 import type { MapBrowserEvent } from 'ol';
 
 /** Options for OSMWaySnap interaction */
-export type OSMWaySnapOptions = {
+type SnapOptions = {
   /** True to automatically fit map view to next candidantes. (default: true) */
   autoFocus?: boolean,
 
@@ -28,14 +28,20 @@ export type OSMWaySnapOptions = {
   source: VectorSource<Feature<LineString>>,
 
   /** Ways source for snapping (default to a new instance of OSMOverpassWaySource) */
-  waySource?: VectorSource<Feature<LineString>>,
+  waySource: VectorSource<Feature<LineString>>,
 
   /** Create a new way layer from way source (if provided) and add to map (default: true) */
   createAndAddWayLayer?: boolean,
 
   /** WrapX */
   wrapX?: boolean
-} & OSMOverpassSourceOptions;
+};
+
+type SnapOptionsOSMOverpassWaySource = Omit<SnapOptions, 'waySource'> & {
+  waySource?: undefined
+} & Partial<OSMOverpassSourceOptions>;
+
+export type OSMWaySnapOptions = SnapOptions | SnapOptionsOSMOverpassWaySource;
 
 /**
  * Interaction for snapping linestring to way elements from OSM
@@ -149,6 +155,23 @@ export default class OSMWaySnap extends PointerInteraction {
   }
 
   /**
+   * Get active feature
+   */
+  public getActiveFeature(): Feature<LineString>|undefined {
+    return this.activeFeature;
+  }
+
+  /** Called when the editing is finished, clear all the sketching and candidates. */
+  public finishEditing() {
+    this.activeFeature = undefined;
+    this.coordinates = [];
+    this.removeSketchPoint();
+    this.removeSketchLine();
+    this.removeCandidateLines();
+    this.removeCandidatePoints();
+  }
+
+  /**
    * Check if mouse is clicked (otherwise use default behaviours),
    *  when there is no active feature then create a new feature with the first vertex being the clicked coordinate,
    *  when the feature is already started, then append the coordinates from the sketch line,
@@ -206,39 +229,40 @@ export default class OSMWaySnap extends PointerInteraction {
    * Given a candidate linestring, return coordinate set from the tip of the active feature following that line until the cursor coordinate,
    *  or return an empty coordinate set if the candidate is not valid according to cursor position.
    * @param mouseCoor Coordinate of user cursor
-   * @param lineString A candidate way linestring
+   * @param candidate A candidate way linestring
    * @returns Coordinates set of sketch line
    */
-  private getSketchLineCoordinates(mouseCoor: Coordinate, lineString: LineString): Coordinate[] {
-    const lastFeatureCoors = this.activeFeature!.getGeometry()!.getLastCoordinate();
-    if (!lineString.getCoordinates().some(c => c[0] === lastFeatureCoors[0] && c[1] === lastFeatureCoors[1])) {
-      lineString = LineStringUtils.split(lineString, lastFeatureCoors);
+  private getSketchLineCoordinates(mouseCoor: Coordinate, candidate: LineString): Coordinate[] {
+    const candidateIsLoop: boolean = candidate.getFirstCoordinate()[0] === candidate.getLastCoordinate()[0]
+      && candidate.getFirstCoordinate()[1] === candidate.getLastCoordinate()[1];
+
+    const activeFeatureLastCoor = this.activeFeature!.getGeometry()!.getLastCoordinate();
+
+    if (candidateIsLoop && activeFeatureLastCoor[0] === mouseCoor[0] && activeFeatureLastCoor[1] === mouseCoor[1]) {
+      return [];
     }
-    if (!lineString.getCoordinates().some(c => c[0] === mouseCoor[0] && c[1] === mouseCoor[1])) {
-      lineString = LineStringUtils.split(lineString, mouseCoor);
+
+    if (!candidate.getCoordinates().some(c => c[0] === activeFeatureLastCoor[0] && c[1] === activeFeatureLastCoor[1])) {
+      candidate = LineStringUtils.split(candidate, activeFeatureLastCoor);
+    }
+    if (!candidate.getCoordinates().some(c => c[0] === mouseCoor[0] && c[1] === mouseCoor[1])) {
+      candidate = LineStringUtils.split(candidate, mouseCoor);
     }
 
-    const lastFeatureCoorsIdx = lineString.getCoordinates()
-      .findIndex(c => c[0] === lastFeatureCoors[0] && c[1] === lastFeatureCoors[1]);
-    if (lastFeatureCoorsIdx < 0) return [];
+    const startIdx = candidate.getCoordinates().findIndex(c => c[0] === activeFeatureLastCoor[0] && c[1] === activeFeatureLastCoor[1]);
+    if (startIdx < 0) return [];
+    const endIdx = candidate.getCoordinates().findIndex(c => c[0] === mouseCoor[0] && c[1] === mouseCoor[1]);
 
-    const mouseCoorsIdx = (
-      lineString.getFirstCoordinate()[0] === lineString.getLastCoordinate()[0]
-      && lineString.getLastCoordinate()[1] === lineString.getLastCoordinate()[1]
-      && lineString.getFirstCoordinate()[0] === mouseCoor[0]
-      && lineString.getFirstCoordinate()[1] === mouseCoor[1]
-    ) ? (lastFeatureCoorsIdx + 1 > lineString.getCoordinates().length / 2 ? lineString.getCoordinates().length - 1 : 0)
-        : lineString.getCoordinates().findIndex(c => c[0] === mouseCoor[0] && c[1] === mouseCoor[1]);;
-    if (mouseCoorsIdx < 0) return [];
-    if (mouseCoorsIdx === lastFeatureCoorsIdx) return [];
-
-    if (lastFeatureCoorsIdx < mouseCoorsIdx) {
-      return lineString.getCoordinates()
-        .slice(lastFeatureCoorsIdx, mouseCoorsIdx + 1)
+    if (candidateIsLoop) return LineStringUtils.getShorterPathOnLoop(candidate, startIdx, endIdx);
+    if (endIdx < 0) return [];
+    if (endIdx === startIdx) return [];
+    if (startIdx < endIdx) {
+      return candidate.getCoordinates()
+        .slice(startIdx, endIdx + 1)
         .map(c => [...c]);
     }
-    return lineString.getCoordinates()
-      .slice(mouseCoorsIdx, lastFeatureCoorsIdx + 1)
+    return candidate.getCoordinates()
+      .slice(endIdx, startIdx + 1)
       .reverse()
       .map(c => [...c]);
   }
@@ -285,9 +309,10 @@ export default class OSMWaySnap extends PointerInteraction {
     const lastFeatureCoors = this.activeFeature!.getGeometry()!.getLastCoordinate();
     this.candidateLines = this.waySource.getFeatures().filter(
       feature => feature.getGeometry()!.containsXY(lastFeatureCoors[0], lastFeatureCoors[1])
-    ).map(f => {
-      f = new Feature(f.getGeometry());
+    ).map(c => {
+      const f = new Feature(c.getGeometry());
       f.setProperties({ candidate: true });
+      f.setId(c.getId());
       return f;
     });
     this.candidatePoints = this.candidateLines.map(l => l.getGeometry()!.getCoordinates()).flat()
@@ -319,23 +344,25 @@ export default class OSMWaySnap extends PointerInteraction {
    * @param coordinate Coordinate
    */
   private createOrUpdateSketchLine(coordinate: Coordinate) {
-    const candidates = new VectorSource({
-      features: this.candidateLines.filter(
-        feature => feature.getGeometry()!.containsXY(coordinate[0], coordinate[1])
-      )
-    });
-    const closestCandidate = candidates.getClosestFeatureToCoordinate(coordinate);
-    const lineCoors = closestCandidate ?
-      this.getSketchLineCoordinates(coordinate, closestCandidate.getGeometry()!)
-      : [this.activeFeature!.getGeometry()!.getLastCoordinate(), coordinate];
-    if (!lineCoors.length) {
+    const candidates = this.candidateLines.filter(
+      feature => feature.getGeometry()!.containsXY(coordinate[0], coordinate[1])
+    );
+    let sketchCoors: Coordinate[] = candidates.length ? [] : [this.activeFeature!.getGeometry()!.getLastCoordinate(), coordinate];
+    for (const candidate of candidates) {
+      const candidateSketchCoors = this.getSketchLineCoordinates(coordinate, candidate.getGeometry()!);
+      if (candidateSketchCoors.length) {
+        sketchCoors = candidateSketchCoors;
+        break;
+      }
+    }
+    if (!sketchCoors.length) {
       return this.removeSketchLine();
     }
 
     if (this.sketchLine) {
-      this.sketchLine.getGeometry()!.setCoordinates(lineCoors);
+      this.sketchLine.getGeometry()!.setCoordinates(sketchCoors);
     } else {
-      this.sketchLine = new Feature(new LineString(lineCoors));
+      this.sketchLine = new Feature(new LineString(sketchCoors));
     }
     this.updateSketchLayer();
   }
@@ -364,16 +391,6 @@ export default class OSMWaySnap extends PointerInteraction {
   private removeCandidatePoints() {
     this.candidatePoints = [];
     this.updateSketchLayer();
-  }
-
-  /** Called when the editing is finished, clear all the sketching and candidates. */
-  private finishEditing() {
-    this.activeFeature = undefined;
-    this.coordinates = [];
-    this.removeSketchPoint();
-    this.removeSketchLine();
-    this.removeCandidateLines();
-    this.removeCandidatePoints();
   }
 
   /**

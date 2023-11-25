@@ -110,55 +110,6 @@ mao.addInteraction(interaction);
 
 ### Using as CDN
 
-```html
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v8.2.0/ol.css">
-    <style>
-      #map {
-        width: 100%;
-        height: 90vh;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="map"></div>
-    <script src="https://cdn.jsdelivr.net/npm/ol@v8.2.0/dist/ol.js"></script>
-    <script src="https://www.unpkg.com/ol-osmwaysnap/dist/webpack/index.js"></script>
-    <script lang="js">
-      const basemap = new ol.layer.Tile({ source: new ol.source.OSM() });
-
-      const targetFeaturesLayer = new ol.layer.Vector({
-        source: new ol.source.Vector(),
-        style: new ol.style.Style({
-          stroke: new ol.style.Stroke({
-            width: 4,
-            color: '#ff0000'
-          })
-        })
-      });
-
-      const map = new ol.Map({
-        target: 'map',
-        layers: [basemap, targetFeaturesLayer],
-        view: new ol.View({
-          center: [11018989, 2130015],
-          zoom: 16
-        })
-      });
-
-      const interaction = new OSMWaySnap.OSMWaySnap({
-        source: targetFeaturesLayer.getSource(),
-        maximumResolution: 5,
-        fetchBufferSize: 250,
-        overpassEndpointURL: 'https://...' // Choose one instance from https://wiki.openstreetmap.org/wiki/Overpass_API#Public_Overpass_API_instances
-      });
-      map.addInteraction(interaction);
-    </script>
-  </body>
-</html>
-```
+[HTML Example](./examples/index.html)
 
 ---
