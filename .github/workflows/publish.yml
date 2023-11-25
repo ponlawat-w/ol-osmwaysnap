@@ -38,5 +38,5 @@ jobs:
       run: |
         git config --global user.name "ponlawat-w"
         git config --global user.email "ponlawat_w@outlook.co.th"
-        git tag -fa ${{ steps.get-package-version.outputs.VERSION }}
-        git push --force origin ${{ steps.get-package-version.outputs.VERSION }}
+        git tag -fa "v${{ steps.get-package-version.outputs.VERSION }}" -m "v${{ steps.get-package-version.outputs.VERSION }}"
+        git push --force origin v${{ steps.get-package-version.outputs.VERSION }}
