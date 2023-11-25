@@ -105,7 +105,7 @@ const interaction = new OSMWaySnap({
   fetchBufferSize: 250,
   overpassEndpointURL: 'https://...' // Choose one instance from https://wiki.openstreetmap.org/wiki/Overpass_API#Public_Overpass_API_instances
 });
-mao.addInteraction(interaction);
+map.addInteraction(interaction);
 ```
 
 ### Using as CDN
