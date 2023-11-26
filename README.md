@@ -65,6 +65,8 @@ map.addInteraction(interaction);
 - `waySource?: VectorSource<Feature<LineString>>` - Ways source for snapping (default to a new instance of OSMOverpassWaySource)
 - `createAndAddWayLayer?: boolean` - Create a new way layer from way source (if provided) and add to map (default: true)
 - `wrapX?: boolean` - WrapX
+- `allowCreate?: boolean` - Whether to allow creating a new feature (default: true)
+- `allowEdit?: boolean` - Whether allow geometry edition to start when clicking on an existing feature, the option can be later configured in allowEdit property of OSMWaySnap class (default: true)
 
 If `waySource` is not provided, `OSMOverpass` will be used as source for snapping, so the constructor options for `OSMWaySnap` will be extended to include [thoses options from `OSMOverpassSourceBase`](https://github.com/ponlawat-w/ol-osmoverpass#constructor-options).
 

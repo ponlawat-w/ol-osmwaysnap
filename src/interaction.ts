@@ -36,10 +36,10 @@ type SnapOptions = {
   /** WrapX */
   wrapX?: boolean,
 
-  /** Whether to allow creating a new feature */
+  /** Whether to allow creating a new feature (default: true) */
   allowCreate?: boolean,
 
-  /** Whether allow geometry edition to start when clicking on an existing feature, the option can be later configured in allowEdit property of OSMWaySnap class */
+  /** Whether allow geometry edition to start when clicking on an existing feature, the option can be later configured in allowEdit property of OSMWaySnap class (default: true) */
   allowEdit?: boolean
 };
 
