@@ -320,7 +320,7 @@ export default class OSMWaySnap extends PointerInteraction {
   }
 
   /**
-   * Update the over layer.
+   * Update the overlay layer.
    */
   private updateOverlayLayer() {
     const source = this.overlayLayer.getSource()!;
