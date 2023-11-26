@@ -34,7 +34,13 @@ type SnapOptions = {
   createAndAddWayLayer?: boolean,
 
   /** WrapX */
-  wrapX?: boolean
+  wrapX?: boolean,
+
+  /** Whether to allow creating a new feature (default: true) */
+  allowCreate?: boolean,
+
+  /** Whether allow geometry edition to start when clicking on an existing feature, the option can be later configured in allowEdit property of OSMWaySnap class (default: true) */
+  allowEdit?: boolean
 };
 
 type SnapOptionsOSMOverpassWaySource = Omit<SnapOptions, 'waySource'> & {
@@ -48,6 +54,15 @@ export type OSMWaySnapOptions = SnapOptions | SnapOptionsOSMOverpassWaySource;
  * This is designed to use with Snap interaction.
  */
 export default class OSMWaySnap extends PointerInteraction {
+  /** Whether to allow geometry edition to start when clicking on an existing feature */
+  public allowEdit: boolean = true;
+  /** Whether to allow creating a new feature */
+  public allowCreate: boolean = true
+  /** True to automatically fit map view to next candidantes. */
+  public autoFocus: boolean = true;
+  /** Used with autoFocus, specify number to add padding to view fitting. */
+  public focusPadding: number = 50;
+
   /** Coordinates of active linestring */
   private coordinates: Coordinate[] = [];
   /** Feature that is being edited */
@@ -59,23 +74,19 @@ export default class OSMWaySnap extends PointerInteraction {
   private sketchPoint?: Feature<Point> = undefined;
   /** Sketch point for placeholder on map */
   private sketchLine?: Feature<LineString> = undefined;
+  /** Partial line of the original geometry from active feature that will be either removed or merged by editing */
+  private draftOriginalLine?: Feature<LineString> = undefined;
   /** Candidate points for selection on map */
   private candidatePoints: Feature<Point>[] = [];
   /** Candidate lines for selection on map */
   private candidateLines: Feature<LineString>[] = [];
+  /** Indicate if sketchLine is merging to draft original line */
+  private mergingDraftOriginalLine: boolean = false;
 
-  /** True to automatically fit map view to next candidantes. */
-  private autoFocus: boolean;
-  /** Used with autoFocus, specify number to add padding to view fitting. */
-  private focusPadding: number;
   /** Target source of edition */
   private source: VectorSource<Feature<LineString>>;
   /** Ways source for snapping */
   private waySource: VectorSource<Feature<LineString>>;
-  /** Create a new way layer from way source (if provided) and add to map */
-  private createAndAddWayLayer: boolean;
-  /** WrapX */
-  private wrapX: boolean|undefined = undefined;
 
   /** Map */
   private map: Map|undefined = undefined;
@@ -91,8 +102,10 @@ export default class OSMWaySnap extends PointerInteraction {
    */
   public constructor(options: OSMWaySnapOptions) {
     super();
-    this.autoFocus = options.autoFocus === undefined ? true: options.autoFocus;
-    this.focusPadding = options.focusPadding ?? 50;
+    if (options.allowCreate !== undefined) this.allowCreate = options.allowCreate;
+    if (options.allowEdit !== undefined) this.allowEdit = options.allowEdit;
+    if (options.autoFocus !== undefined) this.autoFocus = options.autoFocus;
+    if (options.focusPadding !== undefined) this.focusPadding = options.focusPadding;
     this.source = options.source;
     this.waySource = options.waySource ?? new OSMOverpassWaySource({
       cachedFeaturesCount: options.cachedFeaturesCount ?? undefined,
@@ -101,17 +114,15 @@ export default class OSMWaySnap extends PointerInteraction {
       overpassQuery: options.overpassQuery ?? '(way["highway"];>;);',
       overpassEndpointURL: options.overpassEndpointURL ?? undefined
     });
-    this.createAndAddWayLayer = options.createAndAddWayLayer === undefined ? true : options.createAndAddWayLayer;
-    this.wrapX = options.wrapX;
     this.snapInteraction = new Snap({ source: this.waySource });
 
-    if (this.createAndAddWayLayer) {
+    if (options.createAndAddWayLayer ?? true) {
       this.wayLayer = new VectorLayer({ source: this.waySource, style: OSMOverpassWaySource.getDefaultStyle() });
     }
     this.overlayLayer = new VectorLayer({
-      source: new VectorSource({ useSpatialIndex: false, wrapX: this.wrapX }),
+      source: new VectorSource({ useSpatialIndex: false, wrapX: options.wrapX ?? true }),
       updateWhileInteracting: true,
-      style: options.sketchStyle ?? OSMWaySnap.getDefaultSketchStyle()
+      style: options.sketchStyle ?? OSMWaySnap.getDefaultOverlayStyle()
     });
 
     this.addChangeListener('active', this.activeChanged.bind(this));
@@ -163,12 +174,20 @@ export default class OSMWaySnap extends PointerInteraction {
 
   /** Called when the editing is finished, clear all the sketching and candidates. */
   public finishEditing() {
+    if (this.autoFocus && this.map && this.activeFeature && this.coordinates.length > 1) {
+      this.map.getView().fit(this.activeFeature.getGeometry()!.getExtent(), { padding: Array(4).fill(this.focusPadding) });
+    }
     this.activeFeature = undefined;
     this.coordinates = [];
     this.removeSketchPoint();
     this.removeSketchLine();
     this.removeCandidateLines();
     this.removeCandidatePoints();
+    if (this.draftOriginalLine && this.waySource.hasFeature(this.draftOriginalLine)) {
+      this.waySource.removeFeature(this.draftOriginalLine);
+    }
+    this.draftOriginalLine = undefined;
+    this.mergingDraftOriginalLine = false;
   }
 
   /**
@@ -181,9 +200,20 @@ export default class OSMWaySnap extends PointerInteraction {
   public handleEvent(event: MapBrowserEvent<MouseEvent>): boolean {
     if (event.type !== 'click') return super.handleEvent(event);
     if (!this.coordinates.length) {
-      this.coordinates = [this.sketchPoint?.getGeometry()!.getCoordinates() ?? event.coordinate];
-      this.updateFeature();
-      return false;
+      if (this.allowEdit) {
+        const overlappedFeatures = this.source.getFeatures().filter(f => f.getGeometry()?.intersectsCoordinate(event.coordinate) ?? false);
+        if (overlappedFeatures.length) {
+          this.enterEditMode(overlappedFeatures[0], event.coordinate);
+          this.updateFeature();
+          return false;
+        }
+      }
+      if (this.allowCreate) {
+        this.coordinates = [this.sketchPoint?.getGeometry()!.getCoordinates() ?? event.coordinate];
+        this.updateFeature();
+        return false;
+      }
+      return super.handleEvent(event);
     }
     const lastCoors = this.activeFeature!.getGeometry()!.getLastCoordinate();
     if (lastCoors[0] === event.coordinate[0] && lastCoors[1] === event.coordinate[1]) {
@@ -193,6 +223,7 @@ export default class OSMWaySnap extends PointerInteraction {
     if (this.sketchLine) {
       this.coordinates.push(...this.sketchLine.getGeometry()!.getCoordinates().slice(1));
       this.updateFeature();
+      if (this.mergingDraftOriginalLine) this.finishEditing();
       return false;
     }
     return super.handleEvent(event);
@@ -208,6 +239,27 @@ export default class OSMWaySnap extends PointerInteraction {
       this.createOrUpdateSketchLine(event.coordinate);
     }
     return super.handleMoveEvent(event);
+  }
+
+  /**
+   * Start editing on the selected feature
+   * @param feature Feature to edit
+   * @param fromCoordinate Coordinate on feature geometry to starts altering, the original vertices after this coordinate will go to draft in overlay layer
+   */
+  private enterEditMode(feature: Feature<LineString>, fromCoordinate: Coordinate) {
+    const originalCoordinates = feature.getGeometry()!.getCoordinates();
+    const fromCoordinateIdx = originalCoordinates.findIndex(c => c[0] === fromCoordinate[0] && c[1] === fromCoordinate[1]);
+    this.coordinates = originalCoordinates.slice(0, fromCoordinateIdx + 1);
+    this.draftOriginalLine = new Feature({
+      draft: true,
+      geometry: new LineString(
+        originalCoordinates.slice(fromCoordinateIdx)
+      )
+    });
+    this.waySource.addFeature(this.draftOriginalLine);
+    feature.getGeometry()!.setCoordinates(this.coordinates);
+    this.activeFeature = feature;
+    this.mergingDraftOriginalLine = false;
   }
 
   /**
@@ -268,11 +320,12 @@ export default class OSMWaySnap extends PointerInteraction {
   }
 
   /**
-   * Update the sketch layer displayed.
+   * Update the overlay layer.
    */
-  private updateSketchLayer() {
+  private updateOverlayLayer() {
     const source = this.overlayLayer.getSource()!;
     source.clear(true);
+    if (this.draftOriginalLine) source.addFeature(this.draftOriginalLine);
     if (this.sketchLine) source.addFeature(this.sketchLine);
     source.addFeatures(this.candidateLines);
     source.addFeatures(this.candidatePoints);
@@ -328,12 +381,34 @@ export default class OSMWaySnap extends PointerInteraction {
    * @param coordinate Coordinate
    */
   private createOrUpdateSketchPoint(coordinate: Coordinate) {
+    if (!this.allowCreate && !this.activeFeature) {
+      return this.removeSketchPoint();
+    }
     if (this.sketchPoint) {
       this.sketchPoint.getGeometry()!.setCoordinates(coordinate);
     } else {
       this.sketchPoint = new Feature(new Point(coordinate));
     }
-    this.updateSketchLayer();    
+    this.updateOverlayLayer();    
+  }
+
+  /**
+   * This method alters array in place.
+   * If the last coordinate is on draftOriginalLine, extend it from the last coordinate until the remaining of the draftOriginalLine
+   * @param coordinates Original sketch line coordinates to get extended
+   */
+  private extendSketchLineCoorsToDraftOriginal(coordinates: Coordinate[]) {
+    const lastCoordinate = coordinates[coordinates.length - 1];
+    if (!this.draftOriginalLine || !this.draftOriginalLine.getGeometry()!.intersectsCoordinate(lastCoordinate)) return;
+    let lineToExtend = this.draftOriginalLine.getGeometry()!;
+    let idx = this.draftOriginalLine.getGeometry()!.getCoordinates()
+      .findIndex(c => c[0] === lastCoordinate[0] && c[1] === lastCoordinate[1]);
+    if (idx < 0) {
+      lineToExtend = LineStringUtils.split(lineToExtend, lastCoordinate);
+    }
+    const extendFromIdx = lineToExtend.getCoordinates().findIndex(c => c[0] === lastCoordinate[0] && c[1] === lastCoordinate[1]);
+    coordinates.push(...lineToExtend.getCoordinates().slice(extendFromIdx + 1));
+    this.mergingDraftOriginalLine = true;
   }
 
   /**
@@ -359,38 +434,40 @@ export default class OSMWaySnap extends PointerInteraction {
       return this.removeSketchLine();
     }
 
+    if (this.allowEdit) {
+      this.extendSketchLineCoorsToDraftOriginal(sketchCoors);
+    }
+
     if (this.sketchLine) {
       this.sketchLine.getGeometry()!.setCoordinates(sketchCoors);
     } else {
       this.sketchLine = new Feature(new LineString(sketchCoors));
     }
-    this.updateSketchLayer();
+    this.updateOverlayLayer();
   }
 
   /** Remove sketch point. */
   private removeSketchPoint() {
-    if (!this.sketchPoint) return;
     this.sketchPoint = undefined;
-    this.updateSketchLayer();
+    this.updateOverlayLayer();
   }
 
   /** Remove sketch line. */
   private removeSketchLine() {
-    if (!this.sketchLine) return;
     this.sketchLine = undefined;
-    this.updateSketchLayer();
+    this.updateOverlayLayer();
   }
 
   /** Remove all the candidate lines. */
   private removeCandidateLines() {
     this.candidateLines = [];
-    this.updateSketchLayer();
+    this.updateOverlayLayer();
   }
 
   /** Remove all the candidate points. */
   private removeCandidatePoints() {
     this.candidatePoints = [];
-    this.updateSketchLayer();
+    this.updateOverlayLayer();
   }
 
   /**
@@ -401,7 +478,11 @@ export default class OSMWaySnap extends PointerInteraction {
     this.calculateCandidates(false);
   }
 
-  private static getDefaultSketchStyle(): StyleLike {
+  /**
+   * 
+   * @returns 
+   */
+  private static getDefaultOverlayStyle(): StyleLike {
     return feature => {
       if (feature.getProperties().candidate) {
         return feature.getGeometry()!.getType() === 'Point' ?
@@ -416,6 +497,13 @@ export default class OSMWaySnap extends PointerInteraction {
           stroke: new Stroke({
             width: 2,
             color: 'rgba(245,128,2,0.5)'
+          })
+        });
+      } else if (feature.getProperties().draft) {
+        return new Style({
+          stroke: new Stroke({
+            width: 4,
+            color: 'rgba(60,60,60,0.7)'
           })
         });
       } else if (feature.getGeometry()!.getType() === 'Point') {

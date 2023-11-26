@@ -5,10 +5,10 @@ import VectorSource from 'ol/source/Vector';
 import { Projection } from 'ol/proj';
 import { getDefaultWaySource, mouseClick, mouseMove } from './common';
 import { OSMWaySnap } from '../dist';
-import type { Feature } from 'ol';
-import type { LineString, Point } from 'ol/geom';
+import { Feature } from 'ol';
+import { LineString, Point } from 'ol/geom';
 
-describe('Test OSMWaySnap Interaction', () => {
+describe('Test OSMWaySnap Interaction: Line Creation', () => {
   let map: Map;
   let interaction: OSMWaySnap;
   let targetLayer: VectorLayer<VectorSource<Feature<LineString>>>;
@@ -74,6 +74,18 @@ describe('Test OSMWaySnap Interaction', () => {
       targetLayer.getSource()!.getFeatures()
         .some(f => f === interaction.getActiveFeature())
     ).toBeTruthy();
+  });
+
+  it('does not create a new feature if disabled', () => {
+    interaction.allowCreate = false;
+
+    expect(interaction.getActiveFeature()).toBeUndefined();
+    mouseMove(map, interaction, [0, -50]);
+    mouseClick(map, interaction, [0, -50]);
+    expect(interaction.getActiveFeature()).toBeUndefined();
+    mouseMove(map, interaction, [0, 0]);
+    mouseClick(map, interaction, [0, 0]);
+    expect(interaction.getActiveFeature()).toBeUndefined();
   });
 
   it('draws sketch line on mouse moving after started', () => {
