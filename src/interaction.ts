@@ -393,7 +393,7 @@ export default class OSMWaySnap extends PointerInteraction {
   }
 
   /**
-   * This method alter array in place.
+   * This method alters array in place.
    * If the last coordinate is on draftOriginalLine, extend it from the last coordinate until the remaining of the draftOriginalLine
    * @param coordinates Original sketch line coordinates to get extended
    */
