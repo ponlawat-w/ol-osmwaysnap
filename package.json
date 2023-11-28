@@ -1,7 +1,7 @@
 {
   "name": "ol-osmwaysnap",
   "type": "module",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "OpenLayers Interaction Extension for Snapping Ways from OSM using Overpass API",
   "keywords": [
     "osm",

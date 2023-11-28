@@ -8,10 +8,13 @@ import { Vector as VectorSource } from 'ol/source';
 import { Circle, Fill, Stroke } from 'ol/style';
 import Style, { createEditingStyle } from 'ol/style/Style';
 import { OSMOverpassWaySource, type OSMOverpassSourceOptions } from 'ol-osmoverpass';
+import { OSMWaySnapEvent, OSMWaySnapEventType } from './event';
 import LineStringUtils from './line-string-utils';
+import type { MapBrowserEvent } from 'ol';
+import type { EventsKey } from 'ol/events';
 import type { Coordinate } from 'ol/coordinate';
 import type { StyleLike } from 'ol/style/Style';
-import type { MapBrowserEvent } from 'ol';
+import type { OSMWaySnapOnSignature } from './event';
 
 /** Options for OSMWaySnap interaction */
 type SnapOptions = {
@@ -47,6 +50,7 @@ type SnapOptionsOSMOverpassWaySource = Omit<SnapOptions, 'waySource'> & {
   waySource?: undefined
 } & Partial<OSMOverpassSourceOptions>;
 
+/** Options for OSMWaySnap interaction */
 export type OSMWaySnapOptions = SnapOptions | SnapOptionsOSMOverpassWaySource;
 
 /**
@@ -128,6 +132,10 @@ export default class OSMWaySnap extends PointerInteraction {
     this.addChangeListener('active', this.activeChanged.bind(this));
   }
 
+  declare on: OSMWaySnapOnSignature<EventsKey>;
+  declare once: OSMWaySnapOnSignature<EventsKey>;
+  declare un: OSMWaySnapOnSignature<EventsKey>;
+
   /**
    * Remove the interaction from its current map and attach it to the new map.
    * Subclasses may set up event handlers to get notified about changes to
@@ -172,11 +180,14 @@ export default class OSMWaySnap extends PointerInteraction {
     return this.activeFeature;
   }
 
-  /** Called when the editing is finished, clear all the sketching and candidates. */
+  /**
+   * Called when the editing is finished, clear all the sketching and candidates.
+   */
   public finishEditing() {
     if (this.autoFocus && this.map && this.activeFeature && this.coordinates.length > 1) {
       this.map.getView().fit(this.activeFeature.getGeometry()!.getExtent(), { padding: Array(4).fill(this.focusPadding) });
     }
+    const feature = this.activeFeature;
     this.activeFeature = undefined;
     this.coordinates = [];
     this.removeSketchPoint();
@@ -188,6 +199,8 @@ export default class OSMWaySnap extends PointerInteraction {
     }
     this.draftOriginalLine = undefined;
     this.mergingDraftOriginalLine = false;
+    this.updateOverlayLayer();
+    this.dispatchEnd(feature);
   }
 
   /**
@@ -204,13 +217,15 @@ export default class OSMWaySnap extends PointerInteraction {
         const overlappedFeatures = this.source.getFeatures().filter(f => f.getGeometry()?.intersectsCoordinate(event.coordinate) ?? false);
         if (overlappedFeatures.length) {
           this.enterEditMode(overlappedFeatures[0], event.coordinate);
-          this.updateFeature();
+          this.updateFeature(false);
+          this.dispatchStartEdit(this.activeFeature!)
           return false;
         }
       }
       if (this.allowCreate) {
         this.coordinates = [this.sketchPoint?.getGeometry()!.getCoordinates() ?? event.coordinate];
-        this.updateFeature();
+        this.updateFeature(false);
+        this.dispatchStartCreate(this.activeFeature!);
         return false;
       }
       return super.handleEvent(event);
@@ -242,6 +257,40 @@ export default class OSMWaySnap extends PointerInteraction {
   }
 
   /**
+   * Dispatch start and start create events
+   * @param feature Feature to dispatch event, otherwise this.activeFeature!
+   */
+  protected dispatchStartCreate(feature?: Feature<LineString>) {
+    this.dispatchEvent(new OSMWaySnapEvent(OSMWaySnapEventType.WAYSNAPSTART, feature ?? this.activeFeature!));
+    this.dispatchEvent(new OSMWaySnapEvent(OSMWaySnapEventType.WAYSNAPSTARTCREATE, feature ?? this.activeFeature!));
+  }
+
+  /**
+   * Dispatch start and start edit events
+   * @param feature Feature to dispatch event, otherwise this.activeFeature!
+   */
+  protected dispatchStartEdit(feature?: Feature<LineString>) {
+    this.dispatchEvent(new OSMWaySnapEvent(OSMWaySnapEventType.WAYSNAPSTART, feature ?? this.activeFeature!));
+    this.dispatchEvent(new OSMWaySnapEvent(OSMWaySnapEventType.WAYSNAPSTARTEDIT, feature ?? this.activeFeature!));
+  }
+
+  /**
+   * Dispatch update event
+   * @param feature Feature to dispatch event, otherwise this.activeFeature!
+   */
+  protected dispatchUpdate(feature?: Feature<LineString>) {
+    this.dispatchEvent(new OSMWaySnapEvent(OSMWaySnapEventType.WAYSNAPUPDATE, feature ?? this.activeFeature!));
+  }
+
+  /**
+   * Disptach end event
+   * @param feature Feature to dispatch event, otherwise this.activeFeature!
+   */
+  protected dispatchEnd(feature?: Feature<LineString>) {
+    this.dispatchEvent(new OSMWaySnapEvent(OSMWaySnapEventType.WAYSNAPEND, feature ?? this.activeFeature!));
+  }
+
+  /**
    * Start editing on the selected feature
    * @param feature Feature to edit
    * @param fromCoordinate Coordinate on feature geometry to starts altering, the original vertices after this coordinate will go to draft in overlay layer
@@ -264,8 +313,9 @@ export default class OSMWaySnap extends PointerInteraction {
 
   /**
    * Create or update active feature from editing coordinates.
+   * @param dispatch True to dipatch waysnapupdate event
    */
-  private updateFeature() {
+  private updateFeature(dispatch: boolean = true) {
     if (!this.activeFeature) {
       this.activeFeature = new Feature<LineString>(new LineString(this.coordinates));
     } else {
@@ -274,6 +324,7 @@ export default class OSMWaySnap extends PointerInteraction {
         this.source.addFeature(this.activeFeature);
       }
     }
+    dispatch && this.dispatchUpdate();
     this.calculateCandidates();
   }
 
@@ -398,6 +449,7 @@ export default class OSMWaySnap extends PointerInteraction {
    * @param coordinates Original sketch line coordinates to get extended
    */
   private extendSketchLineCoorsToDraftOriginal(coordinates: Coordinate[]) {
+    this.mergingDraftOriginalLine = false;
     const lastCoordinate = coordinates[coordinates.length - 1];
     if (!this.draftOriginalLine || !this.draftOriginalLine.getGeometry()!.intersectsCoordinate(lastCoordinate)) return;
     let lineToExtend = this.draftOriginalLine.getGeometry()!;

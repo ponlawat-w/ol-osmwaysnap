@@ -20,6 +20,7 @@ export default {
   externalsType: 'var',
   externals: {
     'ol': 'ol',
+    'ol/events/Event': 'ol.events.Event',
     'ol/extent': 'ol.extent',
     'ol/Feature': 'ol.Feature',
     'ol/geom': 'ol.geom',

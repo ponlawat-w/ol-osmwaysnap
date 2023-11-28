@@ -4,7 +4,7 @@ import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
 import { Projection } from 'ol/proj';
 import { getDefaultWaySource, mouseClick, mouseMove } from './common';
-import { OSMWaySnap } from '../dist';
+import { OSMWaySnap, OSMWaySnapEventType } from '../dist';
 import { Feature } from 'ol';
 import { LineString, Point } from 'ol/geom';
 
@@ -316,5 +316,50 @@ describe('Test OSMWaySnap Interaction: Line Creation', () => {
     expect(coors[0]).toEqual([0, 0]);
     expect(coors[1]).toEqual([25, 25]);
     expect(coors[2]).toEqual([50, 25]);
+  });
+
+  it('fires events when start creating and finish creating features', () => {
+    let waySnapStart = false;
+    let waySnapStartCreate = false;
+    let waySnapStartEdit = false;
+    let waySnapUpdate = false;
+    let waySnapEnd = false;
+    let startFeature: Feature<LineString>|undefined = undefined;
+    let startCreateFeature: Feature<LineString>|undefined = undefined;
+    let startEditFeature: Feature<LineString>|undefined = undefined;
+    let updateFeature: Feature<LineString>|undefined = undefined;
+    let endFeature: Feature<LineString>|undefined = undefined;
+    interaction.on(OSMWaySnapEventType.WAYSNAPSTART, e => { waySnapStart = true; startFeature = e.feature; });
+    interaction.on(OSMWaySnapEventType.WAYSNAPSTARTCREATE, e => { waySnapStartCreate = true; startCreateFeature = e.feature; });
+    interaction.on(OSMWaySnapEventType.WAYSNAPSTARTEDIT, e => { waySnapStartEdit = true; startEditFeature = e.feature; });
+    interaction.on(OSMWaySnapEventType.WAYSNAPUPDATE, e => { waySnapUpdate = true; updateFeature = e.feature; });
+    interaction.on(OSMWaySnapEventType.WAYSNAPEND, e => { waySnapEnd = true; endFeature = e.feature; });
+
+    mouseMove(map, interaction, [0, 0]);
+    mouseClick(map, interaction, [0, 0]);
+
+    expect(waySnapStart).toBeTruthy();
+    expect(waySnapStartCreate).toBeTruthy();
+    expect(waySnapStartEdit).toBeFalsy();
+    expect(waySnapUpdate).toBeFalsy();
+    expect(waySnapEnd).toBeFalsy();
+    expect(startFeature).toBeDefined();
+    expect(startCreateFeature).toBeDefined();
+    expect(startEditFeature).toBeUndefined();
+    expect(updateFeature).toBeUndefined();
+    expect(endFeature).toBeUndefined();
+    expect(startCreateFeature).toBe(startFeature);
+    
+    mouseMove(map, interaction, [50, 25]);
+    mouseClick(map, interaction, [50, 25]);
+
+    expect(waySnapUpdate).toBeTruthy();
+    expect(waySnapEnd).toBeFalsy();
+    expect(updateFeature).toBe(startCreateFeature);
+
+    mouseClick(map, interaction, [50, 25]);
+
+    expect(waySnapEnd).toBeTruthy();
+    expect(endFeature).toBe(startCreateFeature);
   });
 });
