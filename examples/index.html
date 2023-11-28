@@ -37,9 +37,11 @@
       </div>
     </div>
 
+    <div>
+      <span id="status"></span>
+      |
+      <span id="event"></span>
     </div>
-
-    <div id="status"></div>
     <script src="https://cdn.jsdelivr.net/npm/ol@v8.2.0/dist/ol.js"></script>
     <script src="https://www.unpkg.com/ol-osmwaysnap/dist/bundle/index.js"></script>
     <script lang="js">
@@ -76,10 +78,25 @@
         document.getElementById('status').innerHTML = 'Loading from OSM…';
       });
       interaction.getWaySource().on('featuresloadend', () => {
-        document.getElementById('status').innerHTML = '';
+        document.getElementById('status').innerHTML = 'Idle';
       });
       interaction.getWaySource().on('featuresloaderror', () => {
         document.getElementById('status').innerHTML = 'ERROR';
+      });
+
+      interaction.on('waysnapstartcreate', () => {
+        document.getElementById('event').innerHTML = 'A new feature has been created.';
+      });
+      interaction.on('waysnapstartedit', () => {
+        document.getElementById('event').innerHTML = 'A feature edition has started.';
+      });
+      interaction.on('waysnapupdate', e => {
+        const n = e.feature.getGeometry().getCoordinates().length;
+        document.getElementById('event').innerHTML = `The feature has been updated with vertices: ${n}`;
+      });
+      interaction.on('waysnapend', e => {
+        const n = e.feature.getGeometry().getCoordinates().length;
+        document.getElementById('event').innerHTML = `Feature edition ended with total vertices: ${n}`;
       });
 
       const wkt = new ol.format.WKT();

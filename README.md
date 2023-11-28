@@ -70,9 +70,20 @@ map.addInteraction(interaction);
 
 If `waySource` is not provided, `OSMOverpass` will be used as source for snapping, so the constructor options for `OSMWaySnap` will be extended to include [thoses options from `OSMOverpassSourceBase`](https://github.com/ponlawat-w/ol-osmoverpass#constructor-options).
 
+## Events
+
+All event objects dispatched have property `feature` being the active feature of the interaction.
+
+Event types:
+- `waysnapstart`: when the interaction starts on a feature whether creation or edition.
+- `waysnapstartcreate`: when the interaction has created a new feature.
+- `waysnapstartedit`: when the interaction has started edition an existing feature.
+- `waysnapupdate`: when the interaction has updated the active feature.
+- `waysnapend`: when interaction has finished.
+
 ## Examples
 
-[Full page example using the library from CDN](./examples/index.html)
+[Examples in HTML using CDN](./examples/index.html)
 
 ### Using as module
 
@@ -109,9 +120,5 @@ const interaction = new OSMWaySnap({
 });
 map.addInteraction(interaction);
 ```
-
-### Using as CDN
-
-[HTML Example](./examples/index.html)
 
 ---

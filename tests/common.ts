@@ -10,13 +10,13 @@ import type { OSMWaySnap } from '../dist';
 /**
  * Drawing a linestring network that looks more or less like this:
  *
- *    │
- *  ┌─┴─┐
- *  │   │
- *  └─┬─┘
- *  ──┼──
- *    │
- *    │
+ *    │     => fLoopExtended
+ *  ┌─┴─┐   => fLoop
+ *  │   │   => fLoop
+ *  └─┬─┘   => fCenterToBeforeLoop
+ *  ──┼──   => fCenterTurnLeft / fCenterTurnRight
+ *    │     => fDownToCenter
+ *    │     => fDownToCenter
  * @returns vector source
  */
 export const getDefaultWaySource = (): VectorSource<Feature<LineString>> => {
