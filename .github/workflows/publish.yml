@@ -38,5 +38,9 @@ jobs:
       run: |
         git config --global user.name "ponlawat-w"
         git config --global user.email "ponlawat_w@outlook.co.th"
-        git tag -fa "v${{ steps.get-package-version.outputs.VERSION }}" -m "v${{ steps.get-package-version.outputs.VERSION }}"
+        git tag -fa "v${{ steps.get-package-version.outputs.VERSION }}" -F ./CHANGES.md
         git push --force origin v${{ steps.get-package-version.outputs.VERSION }}
+    - name: Release
+      run: gh release create v${{ steps.get-package-version.outputs.VERSION }} -t v${{ steps.get-package-version.outputs.VERSION }} --notes-from-tag
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
