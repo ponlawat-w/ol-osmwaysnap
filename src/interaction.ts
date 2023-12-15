@@ -404,10 +404,9 @@ export default class OSMWaySnap extends PointerInteraction {
           p => (lastCoordinate[0] === p[0] && lastCoordinate[1] === p[1])
             || !this.activeFeature!.getGeometry()!.intersectsCoordinate(p)
         );
-      if (fitCoordinates.length > 1) {
-        map.getView().fit(boundingExtent(fitCoordinates), {
-          padding: Array(4).fill(this.focusPadding)
-        });
+      const extent = boundingExtent(fitCoordinates);
+      if (fitCoordinates.length > 1 && extent[0] !== extent[2] && extent[1] !== extent[3]) {
+        map.getView().fit(extent, { padding: Array(4).fill(this.focusPadding) });
       }
     }
   }
