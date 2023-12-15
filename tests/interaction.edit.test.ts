@@ -89,6 +89,27 @@ describe('Test OSMWaySnap Interaction: Line Edition', () => {
     expect(draftLine.getGeometry()!.getCoordinates()[5]).toEqual([0, 30]);
   });
 
+  it('enables edit mode by spliting the selected feature on a line segment between vertices', () => {
+    mouseMove(map, interaction, [0, 5]);
+    mouseClick(map, interaction, [0, 5]);
+
+    const activeCoors = interaction.getActiveFeature()!.getGeometry()!.getCoordinates();
+    expect(activeCoors.length).toEqual(3);
+    expect(activeCoors[0]).toEqual([0, -50]);
+    expect(activeCoors[1]).toEqual([0, 0]);
+    expect(activeCoors[2]).toEqual([0, 5]);
+
+    const draftLine = (interaction as any).draftOriginalLine as Feature<LineString>;
+    expect(draftLine).toBeDefined();
+    expect(draftLine.getGeometry()!.getCoordinates().length).toEqual(6);
+    expect(draftLine.getGeometry()!.getCoordinates()[0]).toEqual([0, 5]);
+    expect(draftLine.getGeometry()!.getCoordinates()[1]).toEqual([0, 10]);
+    expect(draftLine.getGeometry()!.getCoordinates()[2]).toEqual([10, 10]);
+    expect(draftLine.getGeometry()!.getCoordinates()[3]).toEqual([10, 20]);
+    expect(draftLine.getGeometry()!.getCoordinates()[4]).toEqual([0, 20]);
+    expect(draftLine.getGeometry()!.getCoordinates()[5]).toEqual([0, 30]);
+  });
+
   it('does not enable edit mode when not allowed', () => {
     interaction.allowEdit = false;
 
