@@ -14,7 +14,7 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "npx tsc && npx webpack",
-    "test": "npm run build && npx vitest run --config ./vitest.config.ts"
+    "test": "npx vitest run --config ./vitest.config.ts"
   },
   "repository": {
     "type": "git",

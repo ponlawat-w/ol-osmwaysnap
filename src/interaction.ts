@@ -428,11 +428,20 @@ export default class OSMWaySnap extends PointerInteraction {
   }
 
   /**
+   * Test if the given coordinate falls on any feature geometries in the source.
+   * @param coordinate Coordinate
+   * @returns True if the given coordinate falls on any features in the source.
+   */
+  private coordinateOnAnyFeatures(coordinate: Coordinate): boolean {
+    return this.source.getFeaturesAtCoordinate(coordinate).length > 0;
+  }
+
+  /**
    * Create or move the sketch point to the specified coordinate
    * @param coordinate Coordinate
    */
   private createOrUpdateSketchPoint(coordinate: Coordinate) {
-    if (!this.allowCreate && !this.activeFeature) {
+    if (!this.allowCreate && this.allowEdit && !this.activeFeature && !this.coordinateOnAnyFeatures(coordinate)) {
       return this.removeSketchPoint();
     }
     if (this.sketchPoint) {
