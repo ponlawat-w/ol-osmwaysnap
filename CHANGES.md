@@ -1,1 +1,2 @@
-Updated imports and exports
+- Added sketch point for edit only mode.
+- Fixed start editing from between line segments.
