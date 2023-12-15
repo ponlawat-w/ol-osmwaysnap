@@ -5,7 +5,7 @@ import EventType from 'ol/MapBrowserEventType'
 import { MouseEvent } from 'happy-dom';
 import type { Map } from 'ol';
 import type { Coordinate } from 'ol/coordinate';
-import type { OSMWaySnap } from '../dist';
+import type { OSMWaySnap } from '../src';
 
 /**
  * Drawing a linestring network that looks more or less like this:

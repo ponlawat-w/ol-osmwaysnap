@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import VectorSource from 'ol/source/Vector';
-import { OSMWaySnap } from '../dist';
+import { OSMWaySnap } from '../src';
 import { OSMOverpassWaySource } from 'ol-osmoverpass';
 import type Feature from 'ol/Feature';
 import type LineString from 'ol/geom/LineString';

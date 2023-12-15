@@ -4,7 +4,7 @@ import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
 import { Projection } from 'ol/proj';
 import { getDefaultWaySource, mouseClick, mouseMove } from './common';
-import { OSMWaySnap, OSMWaySnapEventType } from '../dist';
+import { OSMWaySnap, OSMWaySnapEventType } from '../src';
 import { Feature } from 'ol';
 import { LineString, Point } from 'ol/geom';
 
@@ -49,7 +49,7 @@ describe('Test OSMWaySnap Interaction: Line Creation', () => {
     mouseMove(map, interaction, [-50, -75]);
 
     const sketchPoint = (interaction as any).sketchPoint as Feature<Point>;
-    expect(sketchPoint).toBeTruthy();
+    expect(sketchPoint).toBeDefined();
 
     const coor = sketchPoint.getGeometry()!.getFirstCoordinate();
     expect(coor).toEqual([-50, -75]);

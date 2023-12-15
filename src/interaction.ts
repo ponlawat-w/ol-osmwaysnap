@@ -97,8 +97,10 @@ export default class OSMWaySnap extends PointerInteraction {
 
   /** Layer of snapping ways */
   private wayLayer: VectorLayer<VectorSource<Feature<LineString>>>|undefined = undefined;
-  /** Snap interaction */
-  private snapInteraction: Snap;
+  /** Snap interaction to waySource */
+  private snapWayInteraction: Snap;
+  /** Snap interaction to source */
+  private snapSourceInteraction: Snap;
 
   /**
    * Constructor
@@ -118,7 +120,8 @@ export default class OSMWaySnap extends PointerInteraction {
       overpassQuery: options.overpassQuery ?? '(way["highway"];>;);',
       overpassEndpointURL: options.overpassEndpointURL ?? undefined
     });
-    this.snapInteraction = new Snap({ source: this.waySource });
+    this.snapWayInteraction = new Snap({ source: this.waySource });
+    this.snapSourceInteraction = new Snap({ source: this.source });
 
     if (options.createAndAddWayLayer ?? true) {
       this.wayLayer = new VectorLayer({ source: this.waySource, style: OSMOverpassWaySource.getDefaultStyle() });
@@ -147,7 +150,8 @@ export default class OSMWaySnap extends PointerInteraction {
       this.waySource.un('featuresloadend', this.waysFeaturesLoadEnded.bind(this));
       this.wayLayer && this.map.removeLayer(this.wayLayer);
       this.map.removeLayer(this.overlayLayer);
-      this.map.removeInteraction(this.snapInteraction);
+      this.map.removeInteraction(this.snapWayInteraction);
+      this.map.removeInteraction(this.snapSourceInteraction);
     }
     super.setMap(map);
     this.map = map ?? undefined;
@@ -155,7 +159,10 @@ export default class OSMWaySnap extends PointerInteraction {
       this.waySource.on('featuresloadend', this.waysFeaturesLoadEnded.bind(this));
       this.wayLayer && this.map.getAllLayers().indexOf(this.wayLayer) < 0 && this.map.addLayer(this.wayLayer);
       this.map.addLayer(this.overlayLayer);
-      this.map.getInteractions().getArray().indexOf(this.snapInteraction) < 0 && this.map.addInteraction(this.snapInteraction);
+      this.map.removeInteraction(this.snapWayInteraction);
+      this.map.addInteraction(this.snapWayInteraction);
+      this.map.removeInteraction(this.snapSourceInteraction);
+      this.map.addInteraction(this.snapSourceInteraction);
     }
   }
 
@@ -296,6 +303,7 @@ export default class OSMWaySnap extends PointerInteraction {
    * @param fromCoordinate Coordinate on feature geometry to starts altering, the original vertices after this coordinate will go to draft in overlay layer
    */
   private enterEditMode(feature: Feature<LineString>, fromCoordinate: Coordinate) {
+    feature.getGeometry()!.setCoordinates(LineStringUtils.split(feature.getGeometry()!, fromCoordinate).getCoordinates());
     const originalCoordinates = feature.getGeometry()!.getCoordinates();
     const fromCoordinateIdx = originalCoordinates.findIndex(c => c[0] === fromCoordinate[0] && c[1] === fromCoordinate[1]);
     this.coordinates = originalCoordinates.slice(0, fromCoordinateIdx + 1);
@@ -396,10 +404,9 @@ export default class OSMWaySnap extends PointerInteraction {
           p => (lastCoordinate[0] === p[0] && lastCoordinate[1] === p[1])
             || !this.activeFeature!.getGeometry()!.intersectsCoordinate(p)
         );
-      if (fitCoordinates.length > 1) {
-        map.getView().fit(boundingExtent(fitCoordinates), {
-          padding: Array(4).fill(this.focusPadding)
-        });
+      const extent = boundingExtent(fitCoordinates);
+      if (fitCoordinates.length > 1 && extent[0] !== extent[2] && extent[1] !== extent[3]) {
+        map.getView().fit(extent, { padding: Array(4).fill(this.focusPadding) });
       }
     }
   }
@@ -428,11 +435,20 @@ export default class OSMWaySnap extends PointerInteraction {
   }
 
   /**
+   * Test if the given coordinate falls on any feature geometries in the source.
+   * @param coordinate Coordinate
+   * @returns True if the given coordinate falls on any features in the source.
+   */
+  private coordinateOnAnyFeatures(coordinate: Coordinate): boolean {
+    return this.source.getFeaturesAtCoordinate(coordinate).length > 0;
+  }
+
+  /**
    * Create or move the sketch point to the specified coordinate
    * @param coordinate Coordinate
    */
   private createOrUpdateSketchPoint(coordinate: Coordinate) {
-    if (!this.allowCreate && !this.activeFeature) {
+    if (!this.allowCreate && this.allowEdit && !this.activeFeature && !this.coordinateOnAnyFeatures(coordinate)) {
       return this.removeSketchPoint();
     }
     if (this.sketchPoint) {

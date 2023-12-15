@@ -1,7 +1,7 @@
 {
   "name": "ol-osmwaysnap",
   "type": "module",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "OpenLayers Interaction Extension for Snapping Ways from OSM using Overpass API",
   "keywords": [
     "osm",
@@ -14,7 +14,7 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "npx tsc && npx webpack",
-    "test": "npm run build && npx vitest run --config ./vitest.config.ts"
+    "test": "npx vitest run --config ./vitest.config.ts"
   },
   "repository": {
     "type": "git",

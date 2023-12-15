@@ -4,9 +4,10 @@ import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
 import { Projection } from 'ol/proj';
 import { getDefaultWaySource, mouseClick, mouseMove } from './common';
-import { OSMWaySnap, OSMWaySnapEventType } from '../dist';
+import { OSMWaySnap, OSMWaySnapEventType } from '../src';
 import { Feature } from 'ol';
 import { LineString } from 'ol/geom';
+import type { Point } from 'ol/geom';
 
 describe('Test OSMWaySnap Interaction: Line Edition', () => {
   let map: Map;
@@ -54,6 +55,20 @@ describe('Test OSMWaySnap Interaction: Line Edition', () => {
     map.addInteraction(interaction);
   });
 
+  it('shows sketch point when hovering on an editable line', () => {
+    interaction.allowCreate = false;
+    interaction.allowEdit = true;
+
+    const getSketchPoint = () => (interaction as any).sketchPoint as Feature<Point>|undefined;
+
+    mouseMove(map, interaction, [15, 15]);
+    expect(getSketchPoint()).toBeUndefined();
+
+    mouseMove(map, interaction, [10, 10]);
+    expect(getSketchPoint()).toBeDefined();
+    expect(getSketchPoint()!.getGeometry()!.getFirstCoordinate()).toEqual([10, 10]);
+  });
+
   it('enables edit mode by spliting selected feature and displays the remaining as draft line after user clicks on an existing feature', () => {
     mouseMove(map, interaction, [0, 0]);
     mouseClick(map, interaction, [0, 0]);
@@ -67,6 +82,27 @@ describe('Test OSMWaySnap Interaction: Line Edition', () => {
     expect(draftLine).toBeDefined();
     expect(draftLine.getGeometry()!.getCoordinates().length).toEqual(6);
     expect(draftLine.getGeometry()!.getCoordinates()[0]).toEqual([0, 0]);
+    expect(draftLine.getGeometry()!.getCoordinates()[1]).toEqual([0, 10]);
+    expect(draftLine.getGeometry()!.getCoordinates()[2]).toEqual([10, 10]);
+    expect(draftLine.getGeometry()!.getCoordinates()[3]).toEqual([10, 20]);
+    expect(draftLine.getGeometry()!.getCoordinates()[4]).toEqual([0, 20]);
+    expect(draftLine.getGeometry()!.getCoordinates()[5]).toEqual([0, 30]);
+  });
+
+  it('enables edit mode by spliting the selected feature on a line segment between vertices', () => {
+    mouseMove(map, interaction, [0, 5]);
+    mouseClick(map, interaction, [0, 5]);
+
+    const activeCoors = interaction.getActiveFeature()!.getGeometry()!.getCoordinates();
+    expect(activeCoors.length).toEqual(3);
+    expect(activeCoors[0]).toEqual([0, -50]);
+    expect(activeCoors[1]).toEqual([0, 0]);
+    expect(activeCoors[2]).toEqual([0, 5]);
+
+    const draftLine = (interaction as any).draftOriginalLine as Feature<LineString>;
+    expect(draftLine).toBeDefined();
+    expect(draftLine.getGeometry()!.getCoordinates().length).toEqual(6);
+    expect(draftLine.getGeometry()!.getCoordinates()[0]).toEqual([0, 5]);
     expect(draftLine.getGeometry()!.getCoordinates()[1]).toEqual([0, 10]);
     expect(draftLine.getGeometry()!.getCoordinates()[2]).toEqual([10, 10]);
     expect(draftLine.getGeometry()!.getCoordinates()[3]).toEqual([10, 20]);
