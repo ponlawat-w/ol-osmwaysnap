@@ -120,8 +120,8 @@ export default class OSMWaySnap extends PointerInteraction {
       overpassQuery: options.overpassQuery ?? '(way["highway"];>;);',
       overpassEndpointURL: options.overpassEndpointURL ?? undefined
     });
-    this.snapWayInteraction = new Snap({ source: this.waySource });
-    this.snapSourceInteraction = new Snap({ source: this.source });
+    this.snapWayInteraction = new Snap({ source: this.waySource as unknown as VectorSource });
+    this.snapSourceInteraction = new Snap({ source: this.source as unknown as VectorSource });
 
     if (options.createAndAddWayLayer ?? true) {
       this.wayLayer = new VectorLayer({ source: this.waySource, style: OSMOverpassWaySource.getDefaultStyle() });
