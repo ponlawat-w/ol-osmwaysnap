@@ -217,7 +217,7 @@ export default class OSMWaySnap extends PointerInteraction {
    *  but if the last vertex is clicked, then finalise the editing.
    * @param event Event
    */
-  public handleEvent(event: MapBrowserEvent<MouseEvent>): boolean {
+  public handleEvent(event: MapBrowserEvent): boolean {
     if (event.type !== 'click') return super.handleEvent(event);
     if (!this.coordinates.length) {
       if (this.allowEdit) {
@@ -255,7 +255,7 @@ export default class OSMWaySnap extends PointerInteraction {
    * On mouse is moved, update the sketch point and line.
    * @param event Event
    */
-  protected handleMoveEvent(event: MapBrowserEvent<MouseEvent>): void {
+  protected handleMoveEvent(event: MapBrowserEvent): void {
     this.createOrUpdateSketchPoint(event.coordinate);
     if (this.coordinates.length) {
       this.createOrUpdateSketchLine(event.coordinate);
